@@ -101,6 +101,21 @@ public class TransactionService {
         return accountTransactions;
     }
 
+    @Transactional
+    public void deleteTransaction(Long id) {
+        Transaction transaction = transactionRepository.findByIdWithAccount(id)
+                .orElseThrow(() -> new TransactionNotFoundException("Transaction not found for id: " + id));
+
+        Account account = transaction.getAccount();
+        if (transaction.getType() == TransactionType.DEBIT) {
+            account.credit(transaction.getAmount());
+        } else {
+            account.debit(transaction.getAmount());
+        }
+
+        transactionRepository.delete(transaction);
+    }
+
     public void demonstrateNPlusOneProblem() {
         log.info("N+1 demo: loading transactions without JOIN FETCH");
         List<Transaction> transactions = transactionRepository.findAll();

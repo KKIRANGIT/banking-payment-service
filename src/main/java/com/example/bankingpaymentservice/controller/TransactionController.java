@@ -6,6 +6,7 @@ import com.example.bankingpaymentservice.service.TransactionService;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -25,8 +26,9 @@ public class TransactionController {
     }
 
     /*
-    Example:
+    Example with TELLER or ADMIN token:
     curl -X POST http://localhost:8081/api/transactions ^
+      -H "Authorization: Bearer <JWT_TOKEN>" ^
       -H "Content-Type: application/json" ^
       -d "{\"accountNumber\":\"ACC1001\",\"amount\":500.00,\"type\":\"CREDIT\"}"
      */
@@ -37,8 +39,9 @@ public class TransactionController {
     }
 
     /*
-    Example:
-    curl http://localhost:8081/api/transactions
+    Example with CUSTOMER, TELLER, or ADMIN token:
+    curl http://localhost:8081/api/transactions ^
+      -H "Authorization: Bearer <JWT_TOKEN>"
      */
     @GetMapping
     public List<TransactionResponse> getAllTransactions() {
@@ -46,8 +49,9 @@ public class TransactionController {
     }
 
     /*
-    Example:
-    curl http://localhost:8081/api/transactions/1
+    Example with CUSTOMER, TELLER, or ADMIN token:
+    curl http://localhost:8081/api/transactions/1 ^
+      -H "Authorization: Bearer <JWT_TOKEN>"
      */
     @GetMapping("/{id}")
     public TransactionResponse getTransactionById(@PathVariable Long id) {
@@ -55,11 +59,23 @@ public class TransactionController {
     }
 
     /*
-    Example:
-    curl http://localhost:8081/api/transactions/account/ACC1001
+    Example with CUSTOMER, TELLER, or ADMIN token:
+    curl http://localhost:8081/api/transactions/account/ACC1001 ^
+      -H "Authorization: Bearer <JWT_TOKEN>"
      */
     @GetMapping("/account/{accountNumber}")
     public List<TransactionResponse> getTransactionsByAccount(@PathVariable String accountNumber) {
         return transactionService.getTransactionsByAccount(accountNumber);
+    }
+
+    /*
+    Example with ADMIN token:
+    curl -X DELETE http://localhost:8081/api/transactions/1 ^
+      -H "Authorization: Bearer <JWT_TOKEN>"
+     */
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteTransaction(@PathVariable Long id) {
+        transactionService.deleteTransaction(id);
     }
 }

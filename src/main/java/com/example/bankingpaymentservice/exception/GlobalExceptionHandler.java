@@ -34,6 +34,18 @@ public class GlobalExceptionHandler {
         return buildErrorResponse("INSUFFICIENT_FUNDS", exception.getMessage());
     }
 
+    @ExceptionHandler(UserAlreadyExistsException.class)
+    @ResponseStatus(HttpStatus.CONFLICT)
+    public ErrorResponse handleUserAlreadyExists(UserAlreadyExistsException exception) {
+        return buildErrorResponse("USER_ALREADY_EXISTS", exception.getMessage());
+    }
+
+    @ExceptionHandler(InvalidCredentialsException.class)
+    @ResponseStatus(HttpStatus.UNAUTHORIZED)
+    public ErrorResponse handleInvalidCredentials(InvalidCredentialsException exception) {
+        return buildErrorResponse("INVALID_CREDENTIALS", exception.getMessage());
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     @ResponseStatus(HttpStatus.BAD_REQUEST)
     public ErrorResponse handleValidation(MethodArgumentNotValidException exception) {
