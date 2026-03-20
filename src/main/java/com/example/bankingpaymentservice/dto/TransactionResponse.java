@@ -7,17 +7,21 @@ import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 @Getter
+@Setter
 @Builder
+@NoArgsConstructor
 @AllArgsConstructor
 public class TransactionResponse {
 
-    private final Long id;
-    private final String accountNumber;
-    private final BigDecimal amount;
-    private final String currency;
-    private final TransactionType type;
-    private final TransactionStatus status;
-    private final LocalDateTime createdAt;
+    private Long id;
+    private String accountNumber;
+    private BigDecimal amount;
+    private String currency;
+    private TransactionType type;
+    private TransactionStatus status;
+    private LocalDateTime createdAt;
 }

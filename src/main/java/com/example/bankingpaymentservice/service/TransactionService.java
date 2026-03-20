@@ -10,7 +10,6 @@ import com.example.bankingpaymentservice.model.AccountStatus;
 import com.example.bankingpaymentservice.model.Transaction;
 import com.example.bankingpaymentservice.model.TransactionStatus;
 import com.example.bankingpaymentservice.model.TransactionType;
-import com.example.bankingpaymentservice.repository.AccountRepository;
 import com.example.bankingpaymentservice.repository.TransactionRepository;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -35,20 +34,20 @@ public class TransactionService {
     private static final String DEFAULT_CURRENCY = "USD";
 
     private final TransactionRepository transactionRepository;
-    private final AccountRepository accountRepository;
+    private final AccountService accountService;
     private final FraudCheckService fraudCheckService;
     private final SanctionsCheckService sanctionsCheckService;
     private final Clock clock;
 
     public TransactionService(
             TransactionRepository transactionRepository,
-            AccountRepository accountRepository,
+            AccountService accountService,
             FraudCheckService fraudCheckService,
             SanctionsCheckService sanctionsCheckService,
             Clock clock
     ) {
         this.transactionRepository = transactionRepository;
-        this.accountRepository = accountRepository;
+        this.accountService = accountService;
         this.fraudCheckService = fraudCheckService;
         this.sanctionsCheckService = sanctionsCheckService;
         this.clock = clock;
@@ -59,10 +58,7 @@ public class TransactionService {
         validateBusinessRules(request);
 
         String accountNumber = request.getAccountNumber().trim();
-        Account account = accountRepository.findByAccountNumber(accountNumber)
-                .orElseThrow(() -> new InvalidTransactionException(
-                        "Account not found for account number: " + accountNumber
-                ));
+        Account account = accountService.findAccountEntityByNumber(accountNumber);
 
         if (account.getStatus() != AccountStatus.ACTIVE) {
             throw new InvalidTransactionException("Transactions are allowed only for ACTIVE accounts");
@@ -102,6 +98,7 @@ public class TransactionService {
                 );
             } else {
                 applyBalanceChange(account, amount, request.getType());
+                accountService.updateAccount(account);
                 transaction.setStatus(TransactionStatus.SUCCESS);
                 log.info(
                         "Transaction for account {} marked SUCCESS on thread {}",
@@ -166,6 +163,7 @@ public class TransactionService {
             } else {
                 account.debit(transaction.getAmount());
             }
+            accountService.updateAccount(account);
         }
 
         transactionRepository.delete(transaction);

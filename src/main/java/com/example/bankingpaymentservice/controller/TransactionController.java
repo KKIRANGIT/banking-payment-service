@@ -26,9 +26,10 @@ public class TransactionController {
     }
 
     /*
-    Example with TELLER or ADMIN token:
+    Example with TELLER or ADMIN token and idempotency key:
     curl -X POST http://localhost:8081/api/transactions ^
       -H "Authorization: Bearer <JWT_TOKEN>" ^
+      -H "Idempotency-Key: 123e4567-e89b-12d3-a456-426614174000" ^
       -H "Content-Type: application/json" ^
       -d "{\"accountNumber\":\"ACC1001\",\"amount\":500.00,\"type\":\"CREDIT\"}"
      */

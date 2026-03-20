@@ -6,6 +6,14 @@ spring:
     name: banking-payment-service
   profiles:
     default: dev
+  cache:
+    type: redis
+    cache-names:
+      - accounts
+  data:
+    redis:
+      host: localhost
+      port: 6379
   jpa:
     open-in-view: false
     hibernate:
@@ -22,6 +30,20 @@ security:
   jwt:
     secret: ${JWT_SECRET:banking-payment-service-jwt-secret-key-change-me-1234567890}
     expiration-ms: 86400000
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,cacheevict
+  endpoint:
+    health:
+      show-details: when_authorized
+
+info:
+  app:
+    name: banking-payment-service
+    description: Banking payment service with JWT, async checks, and Redis support
 
 ---
 spring:
