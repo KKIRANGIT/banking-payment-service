@@ -26,7 +26,7 @@ public class TransactionController {
 
     /*
     Example:
-    curl -X POST http://localhost:8080/api/transactions ^
+    curl -X POST http://localhost:8081/api/transactions ^
       -H "Content-Type: application/json" ^
       -d "{\"accountNumber\":\"ACC1001\",\"amount\":500.00,\"type\":\"CREDIT\"}"
      */
@@ -38,7 +38,7 @@ public class TransactionController {
 
     /*
     Example:
-    curl http://localhost:8080/api/transactions
+    curl http://localhost:8081/api/transactions
      */
     @GetMapping
     public List<TransactionResponse> getAllTransactions() {
@@ -47,16 +47,16 @@ public class TransactionController {
 
     /*
     Example:
-    curl http://localhost:8080/api/transactions/{id}
+    curl http://localhost:8081/api/transactions/1
      */
     @GetMapping("/{id}")
-    public TransactionResponse getTransactionById(@PathVariable String id) {
+    public TransactionResponse getTransactionById(@PathVariable Long id) {
         return transactionService.getTransactionById(id);
     }
 
     /*
     Example:
-    curl http://localhost:8080/api/transactions/account/ACC1001
+    curl http://localhost:8081/api/transactions/account/ACC1001
      */
     @GetMapping("/account/{accountNumber}")
     public List<TransactionResponse> getTransactionsByAccount(@PathVariable String accountNumber) {

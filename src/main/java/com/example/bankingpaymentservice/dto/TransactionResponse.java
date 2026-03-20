@@ -13,7 +13,7 @@ import lombok.Getter;
 @AllArgsConstructor
 public class TransactionResponse {
 
-    private final String id;
+    private final Long id;
     private final String accountNumber;
     private final BigDecimal amount;
     private final String currency;

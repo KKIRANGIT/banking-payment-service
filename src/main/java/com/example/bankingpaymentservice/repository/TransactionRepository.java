@@ -1,20 +1,31 @@
 package com.example.bankingpaymentservice.repository;
 
 import com.example.bankingpaymentservice.model.Transaction;
-import java.util.ArrayList;
+import com.example.bankingpaymentservice.model.TransactionStatus;
+import java.math.BigDecimal;
 import java.util.List;
-import org.springframework.stereotype.Repository;
+import java.util.Optional;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
-@Repository
-public class TransactionRepository {
+public interface TransactionRepository extends JpaRepository<Transaction, Long> {
 
-    private final List<Transaction> transactions = new ArrayList<>();
+    List<Transaction> findByStatus(TransactionStatus status);
 
-    public List<Transaction> findAll() {
-        return List.copyOf(transactions);
-    }
+    List<Transaction> findTop5ByOrderByAmountDesc();
 
-    public void saveAll(List<Transaction> newTransactions) {
-        transactions.addAll(newTransactions);
-    }
+    List<Transaction> findByAccountAccountNumber(String accountNumber);
+
+    @Query("select t from Transaction t where t.amount > :amount")
+    List<Transaction> findTransactionsAboveAmount(@Param("amount") BigDecimal amount);
+
+    @Query("select t from Transaction t join fetch t.account order by t.createdAt desc")
+    List<Transaction> findAllWithAccount();
+
+    @Query("select t from Transaction t join fetch t.account where t.id = :id")
+    Optional<Transaction> findByIdWithAccount(@Param("id") Long id);
+
+    @Query("select t from Transaction t join fetch t.account where t.account.accountNumber = :accountNumber order by t.createdAt desc")
+    List<Transaction> findByAccountNumberWithAccount(@Param("accountNumber") String accountNumber);
 }

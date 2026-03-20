@@ -1,87 +1,73 @@
 package com.example.bankingpaymentservice.model;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.Objects;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+import lombok.ToString;
 
+@Entity
+@Table(name = "transactions")
+@Getter
+@Setter
+@NoArgsConstructor
+@ToString(exclude = "account")
 public class Transaction {
 
-    private String id;
-    private String accountNumber;
-    private Money amount;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "account_id", nullable = false)
+    private Account account;
+
+    @Column(nullable = false, precision = 19, scale = 2)
+    private BigDecimal amount;
+
+    @Column(nullable = false, length = 3)
+    private String currency;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
     private TransactionType type;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
     private TransactionStatus status;
+
+    @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
     public Transaction(
-            String id,
-            String accountNumber,
-            Money amount,
+            Account account,
+            BigDecimal amount,
+            String currency,
             TransactionType type,
             TransactionStatus status,
             LocalDateTime createdAt
     ) {
-        this.id = id;
-        this.accountNumber = accountNumber;
+        this.account = account;
         this.amount = amount;
+        this.currency = currency;
         this.type = type;
         this.status = status;
         this.createdAt = createdAt;
     }
 
-    public String getId() {
-        return id;
-    }
-
     public String getAccountNumber() {
-        return accountNumber;
-    }
-
-    public Money getAmount() {
-        return amount;
-    }
-
-    public TransactionType getType() {
-        return type;
-    }
-
-    public TransactionStatus getStatus() {
-        return status;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) {
-            return true;
-        }
-        if (!(o instanceof Transaction that)) {
-            return false;
-        }
-        return Objects.equals(id, that.id)
-                && Objects.equals(accountNumber, that.accountNumber)
-                && Objects.equals(amount, that.amount)
-                && type == that.type
-                && status == that.status
-                && Objects.equals(createdAt, that.createdAt);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(id, accountNumber, amount, type, status, createdAt);
-    }
-
-    @Override
-    public String toString() {
-        return "Transaction{" +
-                "id='" + id + '\'' +
-                ", accountNumber='" + accountNumber + '\'' +
-                ", amount=" + amount +
-                ", type=" + type +
-                ", status=" + status +
-                ", createdAt=" + createdAt +
-                '}';
+        return account == null ? null : account.getAccountNumber();
     }
 }

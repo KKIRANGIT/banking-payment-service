@@ -16,7 +16,7 @@ public final class TransactionAnalyzer {
 
     public static List<Transaction> findTopFiveByAmount(List<Transaction> list) {
         return list.stream()
-                .sorted((left, right) -> right.getAmount().getAmount().compareTo(left.getAmount().getAmount()))
+                .sorted((left, right) -> right.getAmount().compareTo(left.getAmount()))
                 .limit(5)
                 .toList();
     }
@@ -30,10 +30,7 @@ public final class TransactionAnalyzer {
         return list.stream()
                 .collect(Collectors.groupingBy(
                         Transaction::getType,
-                        Collectors.mapping(
-                                transaction -> transaction.getAmount().getAmount(),
-                                Collectors.reducing(BigDecimal.ZERO, BigDecimal::add)
-                        )
+                        Collectors.mapping(Transaction::getAmount, Collectors.reducing(BigDecimal.ZERO, BigDecimal::add))
                 ));
     }
 
