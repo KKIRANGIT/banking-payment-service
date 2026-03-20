@@ -13,8 +13,14 @@ import com.example.bankingpaymentservice.model.TransactionType;
 import com.example.bankingpaymentservice.repository.AccountRepository;
 import com.example.bankingpaymentservice.repository.TransactionRepository;
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,10 +36,22 @@ public class TransactionService {
 
     private final TransactionRepository transactionRepository;
     private final AccountRepository accountRepository;
+    private final FraudCheckService fraudCheckService;
+    private final SanctionsCheckService sanctionsCheckService;
+    private final Clock clock;
 
-    public TransactionService(TransactionRepository transactionRepository, AccountRepository accountRepository) {
+    public TransactionService(
+            TransactionRepository transactionRepository,
+            AccountRepository accountRepository,
+            FraudCheckService fraudCheckService,
+            SanctionsCheckService sanctionsCheckService,
+            Clock clock
+    ) {
         this.transactionRepository = transactionRepository;
         this.accountRepository = accountRepository;
+        this.fraudCheckService = fraudCheckService;
+        this.sanctionsCheckService = sanctionsCheckService;
+        this.clock = clock;
     }
 
     @Transactional
@@ -51,13 +69,8 @@ public class TransactionService {
         }
 
         BigDecimal amount = request.getAmount();
-        if (request.getType() == TransactionType.DEBIT) {
-            if (account.getBalance().compareTo(amount) < 0) {
-                throw new InsufficientFundsException("Insufficient funds for account " + accountNumber);
-            }
-            account.debit(amount);
-        } else {
-            account.credit(amount);
+        if (request.getType() == TransactionType.DEBIT && account.getBalance().compareTo(amount) < 0) {
+            throw new InsufficientFundsException("Insufficient funds for account " + accountNumber);
         }
 
         Transaction transaction = new Transaction(
@@ -65,11 +78,51 @@ public class TransactionService {
                 amount,
                 DEFAULT_CURRENCY,
                 request.getType(),
-                TransactionStatus.SUCCESS,
-                LocalDateTime.now()
+                TransactionStatus.PENDING,
+                LocalDateTime.now(clock)
         );
 
-        Transaction savedTransaction = transactionRepository.save(transaction);
+        try {
+            CompletableFuture<Boolean> fraudFuture = fraudCheckService.checkFraud(transaction);
+            CompletableFuture<Boolean> sanctionsFuture = sanctionsCheckService.checkSanctions(accountNumber);
+
+            CompletableFuture.allOf(fraudFuture, sanctionsFuture)
+                    .orTimeout(3, TimeUnit.SECONDS)
+                    .join();
+
+            boolean isFraudulent = fraudFuture.join();
+            boolean isSanctioned = sanctionsFuture.join();
+
+            if (isFraudulent || isSanctioned) {
+                transaction.setStatus(TransactionStatus.FAILED);
+                log.info(
+                        "Transaction for account {} marked FAILED on thread {}",
+                        accountNumber,
+                        Thread.currentThread().getName()
+                );
+            } else {
+                applyBalanceChange(account, amount, request.getType());
+                transaction.setStatus(TransactionStatus.SUCCESS);
+                log.info(
+                        "Transaction for account {} marked SUCCESS on thread {}",
+                        accountNumber,
+                        Thread.currentThread().getName()
+                );
+            }
+        } catch (CompletionException exception) {
+            if (exception.getCause() instanceof TimeoutException) {
+                transaction.setStatus(TransactionStatus.PENDING);
+                log.warn(
+                        "Transaction checks timed out for account {}. Saving as PENDING on thread {}",
+                        accountNumber,
+                        Thread.currentThread().getName()
+                );
+            } else {
+                throw exception;
+            }
+        }
+
+        Transaction savedTransaction = transactionRepository.saveAndFlush(transaction);
         return toResponse(savedTransaction);
     }
 
@@ -106,11 +159,13 @@ public class TransactionService {
         Transaction transaction = transactionRepository.findByIdWithAccount(id)
                 .orElseThrow(() -> new TransactionNotFoundException("Transaction not found for id: " + id));
 
-        Account account = transaction.getAccount();
-        if (transaction.getType() == TransactionType.DEBIT) {
-            account.credit(transaction.getAmount());
-        } else {
-            account.debit(transaction.getAmount());
+        if (transaction.getStatus() == TransactionStatus.SUCCESS) {
+            Account account = transaction.getAccount();
+            if (transaction.getType() == TransactionType.DEBIT) {
+                account.credit(transaction.getAmount());
+            } else {
+                account.debit(transaction.getAmount());
+            }
         }
 
         transactionRepository.delete(transaction);
@@ -136,6 +191,29 @@ public class TransactionService {
         ));
     }
 
+    public long countPendingTransactions() {
+        return transactionRepository.countByStatus(TransactionStatus.PENDING);
+    }
+
+    public DailyTransactionSummary getTodaySummary() {
+        LocalDate today = LocalDate.now(clock);
+        LocalDateTime startOfDay = today.atStartOfDay();
+        LocalDateTime startOfNextDay = today.plusDays(1).atStartOfDay();
+
+        BigDecimal totalDebit = BigDecimal.ZERO;
+        BigDecimal totalCredit = BigDecimal.ZERO;
+
+        for (Transaction transaction : transactionRepository.findByCreatedAtBetween(startOfDay, startOfNextDay)) {
+            if (transaction.getType() == TransactionType.DEBIT) {
+                totalDebit = totalDebit.add(transaction.getAmount());
+            } else if (transaction.getType() == TransactionType.CREDIT) {
+                totalCredit = totalCredit.add(transaction.getAmount());
+            }
+        }
+
+        return new DailyTransactionSummary(totalDebit, totalCredit);
+    }
+
     private void validateBusinessRules(TransactionRequest request) {
         String normalizedAccountNumber = request.getAccountNumber() == null ? "" : request.getAccountNumber().trim();
         if (normalizedAccountNumber.length() < 4) {
@@ -156,5 +234,16 @@ public class TransactionService {
                 .status(transaction.getStatus())
                 .createdAt(transaction.getCreatedAt())
                 .build();
+    }
+
+    private void applyBalanceChange(Account account, BigDecimal amount, TransactionType type) {
+        if (type == TransactionType.DEBIT) {
+            account.debit(amount);
+        } else {
+            account.credit(amount);
+        }
+    }
+
+    public record DailyTransactionSummary(BigDecimal totalDebit, BigDecimal totalCredit) {
     }
 }
