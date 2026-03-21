@@ -37,6 +37,7 @@ public class TransactionService {
     private final AccountService accountService;
     private final FraudCheckService fraudCheckService;
     private final SanctionsCheckService sanctionsCheckService;
+    private final TransactionEventProducer transactionEventProducer;
     private final Clock clock;
 
     public TransactionService(
@@ -44,12 +45,14 @@ public class TransactionService {
             AccountService accountService,
             FraudCheckService fraudCheckService,
             SanctionsCheckService sanctionsCheckService,
+            TransactionEventProducer transactionEventProducer,
             Clock clock
     ) {
         this.transactionRepository = transactionRepository;
         this.accountService = accountService;
         this.fraudCheckService = fraudCheckService;
         this.sanctionsCheckService = sanctionsCheckService;
+        this.transactionEventProducer = transactionEventProducer;
         this.clock = clock;
     }
 
@@ -77,6 +80,8 @@ public class TransactionService {
                 TransactionStatus.PENDING,
                 LocalDateTime.now(clock)
         );
+        transaction = transactionRepository.saveAndFlush(transaction);
+        transactionEventProducer.publishTransactionInitiated(transaction);
 
         try {
             CompletableFuture<Boolean> fraudFuture = fraudCheckService.checkFraud(transaction);
@@ -91,6 +96,8 @@ public class TransactionService {
 
             if (isFraudulent || isSanctioned) {
                 transaction.setStatus(TransactionStatus.FAILED);
+                transaction = transactionRepository.saveAndFlush(transaction);
+                transactionEventProducer.publishTransactionFailed(transaction);
                 log.info(
                         "Transaction for account {} marked FAILED on thread {}",
                         accountNumber,
@@ -100,6 +107,8 @@ public class TransactionService {
                 applyBalanceChange(account, amount, request.getType());
                 accountService.updateAccount(account);
                 transaction.setStatus(TransactionStatus.SUCCESS);
+                transaction = transactionRepository.saveAndFlush(transaction);
+                transactionEventProducer.publishTransactionCompleted(transaction);
                 log.info(
                         "Transaction for account {} marked SUCCESS on thread {}",
                         accountNumber,
@@ -109,6 +118,7 @@ public class TransactionService {
         } catch (CompletionException exception) {
             if (exception.getCause() instanceof TimeoutException) {
                 transaction.setStatus(TransactionStatus.PENDING);
+                transaction = transactionRepository.saveAndFlush(transaction);
                 log.warn(
                         "Transaction checks timed out for account {}. Saving as PENDING on thread {}",
                         accountNumber,
@@ -119,8 +129,7 @@ public class TransactionService {
             }
         }
 
-        Transaction savedTransaction = transactionRepository.saveAndFlush(transaction);
-        return toResponse(savedTransaction);
+        return toResponse(transaction);
     }
 
     public List<TransactionResponse> getAllTransactions() {
